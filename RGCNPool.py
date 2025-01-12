@@ -417,7 +417,7 @@ if __name__ == "__main__":
 
 
 #Main code execution
-TE18_pyg = torch.load('./../TE18_data_NodeEmbeddings.pt')
+TE18_pyg = torch.load('./TE18_data_NodeEmbeddings.pt')
  
 #convert dataset of pytorch geometric objects into a formt for RGCN (need a different edge format)
 TE18_RGCN = []
