@@ -428,6 +428,7 @@ RGCN_edgePool = RGCNPoolNet(2, 0, 0)
 RGCN_edgePool.load_state_dict(torch.load("./RGCNx2_edgePool_L1Sum_2xPosLabelLoss_0Minscore_percent_edge_labels_2iters_noOnehop_fixed_best_test_performance.pt"))
 sys.stdout = open('RGCN_output.txt','wt')
 loader = DataLoader(TE18_RGCN[:1], batch_size=1)
+RGCN_edgePool.eval()
 for d in loader:
     #y_2d is used only for the pooling part of the network
     y = d.y
