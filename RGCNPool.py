@@ -3,7 +3,8 @@ from typing import Callable, List, NamedTuple, Optional, Tuple
 import torch
 from torch import Tensor
 import torch.nn as nn
-import numpy as np
+#from torch.nn import Parameter
+#import numpy as np
 
 #import torch_geometric
 from torch_geometric.data import Data
@@ -256,12 +257,12 @@ class EdgePoolingRGCN(torch.nn.Module):
         i += j
         #print(cluster)
         # We compute the new features as an addition of the old ones.
-        new_x = scatter(x, cluster, dim=0, dim_size=i, reduce='sum')
+        new_x = scatter(x, cluster, dim=0, dim_size=i, reduce='mean')
         new_edge_score = edge_score[new_edge_indices]
         if int(mask.sum()) > 0:
             remaining_score = x.new_ones(
                 (new_x.size(0) - len(new_edge_indices), ))
-            remaining_score = remaining_score*100
+            remaining_score = remaining_score*0
             new_edge_score = torch.cat([new_edge_score, remaining_score])
         
         new_edge_index, new_edge_attr = coalesce(cluster[edge_index], edge_attr, num_nodes=new_x.size(0))
@@ -295,6 +296,9 @@ class EdgePoolingRGCN(torch.nn.Module):
             * **edge_index** *(torch.Tensor)* - The new edge indices.
             * **batch** *(torch.Tensor)* - The new batch vector.
         """
+        #print(x)
+        #print("=============")
+       #print(unpool_info)
         new_x = x / unpool_info.new_edge_score.view(-1, 1)
         new_x = new_x[unpool_info.cluster]
         return new_x, unpool_info.edge_index, unpool_info.batch
@@ -311,25 +315,26 @@ class varRGCN(torch.nn.Module):
 
         self.num_layers = num_layers
         self.norms = torch.nn.ModuleList()
-        self.n1 = nn.BatchNorm1d(in_channels)
+        self.dropout = torch.nn.ModuleList()
         for _ in range(self.num_layers - 1):
             self.layers.append(RGCNConv(in_channels, in_channels, 20))
+            self.norms.append(nn.BatchNorm1d(in_channels))
+            self.dropout.append(nn.Dropout(p=0.1))
         self.layers.append(self.end_layer)
         #for conv in convs:
-        for _ in range(self.num_layers -1):
-            self.norms.append(self.n1)
+        #for _ in range(self.num_layers -1):
+            #self.norms.append(nn.BatchNorm1d(in_channels))
+        #self.dropout = nn.Dropout
     def forward(self, x, edge_index, edge_attr):
-        
         ind = 0
         for l in self.layers[:-1]:
             x = l(x, edge_index, edge_attr)
             x = self.norms[ind](x)
-            ind += 1
             x = F.relu(x)
-            x = F.dropout(x, 0.2)
-        
+            x = self.dropout[ind](x)
+            ind += 1
         x = self.layers[-1](x, edge_index, edge_attr)
-   
+        
         return x
     
 #turns edges back from format for RGCN back to original format
@@ -386,6 +391,7 @@ class RGCNPoolNet(torch.nn.Module):
             #self.layers.append(self.poolLayer)
     def forward(self, x, edge_index, edge_attr, batch, y_2d):
         pool_info = []
+        """
         print("INPUT DATA INFO")
         print("node embeddings:", x)
         print("edge index:", edge_index)
@@ -399,10 +405,10 @@ class RGCNPoolNet(torch.nn.Module):
             print("sum of layer "+str(counter)+" weights", torch.sum(l.weight))
             counter+=1
         print("====================================\n")
-        print("OUTPUTS")
-
+        #print("OUTPUTS")
+        """
         residue_scores = self.RGCN(x, edge_index, edge_attr)
-        print("outputs of RGCN:", residue_scores)
+        #print("outputs of RGCN:", residue_scores)
        
         onehot_edge_attr = F.one_hot(edge_attr, 20)
         #x_bad is the computed new embeddings from edgepooling but this does not use weighted average so called "x_bad" bc we don't use it
@@ -410,7 +416,7 @@ class RGCNPoolNet(torch.nn.Module):
         x = make_x_cluster(x, unpool.cluster, y_2d)
         y_2d = make_y_cluster(y_2d, unpool.cluster)
         
-        return x, outs, unpool, y_2d, edge_index, transform_edge_attr(onehot_edge_attr), batch, residue_scores
+        return x, outs, unpool, y_2d, edge_index, transform_edge_attr(onehot_edge_attr), batch, residue_scores, x_bad
     
 if __name__ == "__main__":
     print("")
@@ -423,9 +429,14 @@ TE18_pyg = torch.load('./TE18_data_NodeEmbeddings.pt')
 TE18_RGCN = []
 for data in TE18_pyg:
     TE18_RGCN.append(Data(x=data.x, y=data.y, edge_attr = transform_edge_attr(data.edge_attr), edge_index = data.edge_index))
+"""
+RGCN_edgePool = RGCNPoolNet(3, 0, 0)
+#l1 = Parameter(torch.ones([20, 640, 640]))
+#l2 = Parameter(torch.ones([20, 640, 1]))
+#RGCN_edgePool.RGCN.layers[0].weight=l1
+#RGCN_edgePool.RGCN.layers[1].weight=l2
 
-RGCN_edgePool = RGCNPoolNet(2, 0, 0)
-RGCN_edgePool.load_state_dict(torch.load("./RGCNx2_edgePool_L1Sum_2xPosLabelLoss_0Minscore_percent_edge_labels_2iters_noOnehop_fixed_best_test_performance.pt"))
+RGCN_edgePool.load_state_dict(torch.load("./../saved_nets/RGCNx3_edgePool_L1Sum_2xPosLabelLoss_0Minscore_percent_edge_labels_3iters_noOnehop_fixed_best_test_performance.pt"))
 sys.stdout = open('RGCN_output.txt','wt')
 loader = DataLoader(TE18_RGCN[:1], batch_size=1)
 RGCN_edgePool.eval()
@@ -445,3 +456,4 @@ for d in loader:
     RGCN_edgePool(d.x, d.edge_index, d.edge_attr, d.batch, y_2d)
 
 print("end of second run\n")
+"""
