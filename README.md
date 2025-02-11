@@ -1,1 +1,2 @@
-RGCN_Pool.py contains the RGCN edgepooling network as well as a script to execute two passes of the pretrained network and write the output of these passes to "RGCN_output.txt"
+RGCNPool.py contains the RGCN network, performance_training.py contains the function to execute a training run of a given network, build_dataset has the code used to build the testing and training datasets.
+Train.py has the code used in training and testing the network, jaccard.py ahs all the funciton used to calculate jaccard scores.

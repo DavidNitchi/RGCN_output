@@ -143,20 +143,20 @@ def measure_performance_during_training(max_eps, net, net_name, data, val_data_p
     #return test_best_df, test_biggest_df, val_best_df, val_biggest_df, train_loss_overtime
     return test_biggest_df, val_biggest_df, train_loss_overtime, MCC_overtime, AUC_overtime, conf_mats
 
-all_ligands_data_4A = torch.load('./../g_data_ligands_4A_embeddings_min4nbs_0.3seqId.pt')
-all_ligands_ions_data_4A = torch.load('./../g_data_ligands_ions_4A_embeddings_min4nbs_0.3seqId.pt')
+all_ligands_data_4A = torch.load('./data/datasets/train_data_ligands_4A_embeddings_min4nbs_0.3seqId.pt')
+#all_ligands_ions_data_4A = torch.load('./data/datasets/g_data_ligands_ions_4A_embeddings_min4nbs_0.3seqId.pt')
 
-used_pdbs_ligands_4A = torch.load('./../pdbs_ligands_4A_embeddings_min4nbs_0.3seqId.pt')
-used_pdbs_ligands_ions_4A = torch.load('./../pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId.pt')
+used_pdbs_ligands_4A = torch.load('./data/datasets/train_pdbs_ligands_4A_embeddings_min4nbs_0.3seqId.pt')
+#used_pdbs_ligands_ions_4A = torch.load('./data/datasets/pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId.pt')
 
-test_set_ligands_4A = torch.load('./../g_data_ligands_4A_embeddings_min4nbs_0.3seqId_testSet.pt')
-test_set_ligands_ions_4A = torch.load('./../g_data_ligands_ions_4A_embeddings_min4nbs_0.3seqId_testSet.pt')
+test_set_ligands_4A = torch.load('./data/datasets/test_data_ligands_4A_embeddings_min4nbs_0.3seqId.pt')
+#test_set_ligands_ions_4A = torch.load('./data/datasets/g_data_ligands_ions_4A_embeddings_min4nbs_0.3seqId_testSet.pt')
 
-used_pdbs_ligands_test_set_4A = torch.load('./../pdbs_ligands_4A_embeddings_min4nbs_0.3seqId_testSet.pt')
-used_pdbs_ligands_ions_test_set_4A = torch.load('./../pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId_testSet.pt')
+used_pdbs_ligands_test_set_4A = torch.load('./data/test_datasets/pdbs_ligands_4A_embeddings_min4nbs_0.3seqId.pt')
+#used_pdbs_ligands_ions_test_set_4A = torch.load('./data/datasets/pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId_testSet.pt')
 
-used_pdbs_4A = torch.load('./../pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId.pt')
-sites_dict_4A = pickle.load(open('./../Hariboss+PDBbind+RCSB_data_4A_fixed.pkl', 'rb'))
+used_pdbs_4A = torch.load('./data/datasets/pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId.pt')
+sites_dict_4A = pickle.load(open('./data/datasets/Hariboss+PDBbind+RCSB_data_4A_recent.pkl', 'rb'))
 
 RGCN_data = []
 for data in all_ligands_data_4A:
@@ -166,10 +166,10 @@ for data in test_set_ligands_4A:
     test_4A_RGCN.append(Data(x=data.x, y=data.y, edge_attr = transform_edge_attr(data.edge_attr), edge_index = data.edge_index))
 
 RGCN_ions = []
-for data in all_ligands_ions_data_4A:
+for data in all_ligands_data_4A:
     RGCN_ions.append(Data(x=data.x, y=data.y, edge_attr = transform_edge_attr(data.edge_attr), edge_index = data.edge_index))
 test_4A_ions_RGCN = []
-for data in test_set_ligands_ions_4A:
+for data in test_set_ligands_4A:
     test_4A_ions_RGCN.append(Data(x=data.x, y=data.y, edge_attr = transform_edge_attr(data.edge_attr), edge_index = data.edge_index))
 
 
@@ -178,5 +178,5 @@ num_iters=3
 for num_layers in [2, 3, 4]:
     for min_score in [0.5, 0.75, 0.9]:
         rand = RGCNPoolNet(num_layers, 0, min_score)
-        dfs = measure_performance_during_training(50, rand, 'RGCNx'+str(num_layers)+'_edgePool_L1avg_'+str(min_score)+'Minscore_percent_edge_labels_'+ str(num_iters)+'iters_noOnehop_fixed_DO0.1_ligands', RGCN_ions[:], 0.15, used_pdbs_ligands_ions_4A[:], test_4A_ions_RGCN, used_pdbs_ligands_ions_test_set_4A, sites_dict_4A, num_iters)
+        dfs = measure_performance_during_training(50, rand, 'RGCNx'+str(num_layers)+'_edgePool_L1avg_'+str(min_score)+'Minscore_percent_edge_labels_'+ str(num_iters)+'iters_noOnehop_fixed_DO0.1_ligands', RGCN_ions[:], 0.15, used_pdbs_ligands_4A[:], test_4A_ions_RGCN, used_pdbs_ligands_test_set_4A, sites_dict_4A, num_iters)
         torch.save(dfs, './saved_networks_testing/RGCNx'+str(num_layers)+'_edgePool_L1avg_'+str(min_score)+'Minscore_percent_edge_labels_'+ str(num_iters)+'iters_noOnehop_fixed_DO0.1_ligands_RESULTS')
