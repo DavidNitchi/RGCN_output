@@ -429,31 +429,3 @@ TE18_pyg = torch.load('./TE18_data_NodeEmbeddings.pt')
 TE18_RGCN = []
 for data in TE18_pyg:
     TE18_RGCN.append(Data(x=data.x, y=data.y, edge_attr = transform_edge_attr(data.edge_attr), edge_index = data.edge_index))
-"""
-RGCN_edgePool = RGCNPoolNet(3, 0, 0)
-#l1 = Parameter(torch.ones([20, 640, 640]))
-#l2 = Parameter(torch.ones([20, 640, 1]))
-#RGCN_edgePool.RGCN.layers[0].weight=l1
-#RGCN_edgePool.RGCN.layers[1].weight=l2
-
-RGCN_edgePool.load_state_dict(torch.load("./../saved_nets/RGCNx3_edgePool_L1Sum_2xPosLabelLoss_0Minscore_percent_edge_labels_3iters_noOnehop_fixed_best_test_performance.pt"))
-sys.stdout = open('RGCN_output.txt','wt')
-loader = DataLoader(TE18_RGCN[:1], batch_size=1)
-RGCN_edgePool.eval()
-for d in loader:
-    #y_2d is used only for the pooling part of the network
-    y = d.y
-    ones = torch.ones(y.shape)
-    y_2d = torch.column_stack([y, ones])
-    RGCN_edgePool(d.x, d.edge_index, d.edge_attr, d.batch, y_2d)
-
-print("end of first run\n")
-
-for d in loader:
-    y = d.y
-    ones = torch.ones(y.shape)
-    y_2d = torch.column_stack([y, ones])
-    RGCN_edgePool(d.x, d.edge_index, d.edge_attr, d.batch, y_2d)
-
-print("end of second run\n")
-"""

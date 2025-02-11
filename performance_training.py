@@ -6,12 +6,23 @@ import pickle
 import random
 from sklearn.metrics import matthews_corrcoef, f1_score, accuracy_score, roc_auc_score, precision_score, recall_score
 from torcheval.metrics import BinaryConfusionMatrix
+
 def measure_performance_during_training(max_eps, net, net_name, data, val_data_percent, data_pdbs, test_data, test_pdbs, sites_dict, num_iters):
-    #net_desc is a string describing the net, for example: net_GATConvx4_relu_DO-0.2
-    #prev best is the best accuracy achieved on the validation set
-    #this function is designed to train the model and save the models that perform the best on teh validation data
-    #type string is one of 'ligands' 'ions' or 'ligands_ions'
-    #data_performance = []
+    """
+    max_eps: number of epochs to train for
+    net: input neural network
+    net_name: a descriptive string which the network perfromance data will be saved under
+    data: training data
+    val_percent: the percentage of the training data we wish to use for the validaiton set
+    data pdbs: the pdbs of the entries in the dataset in order
+    test_data: test set data
+    test_pdbs: test set data pdbs in order
+    sites_dict: binding sites dictionary
+    num_iters: the number of pooling iterations to run on each batch
+
+    runs a training loop for "max_eps" epochs on "data"
+    evaluates performance on valdiation and test sets every 5 epochs and saves the networks with the best performance
+    """
     #val_inds = torch.load('./validation_indices.pt')
     test_best_performance = []
     test_biggest_performance = []
@@ -48,22 +59,6 @@ def measure_performance_during_training(max_eps, net, net_name, data, val_data_p
         train_loss_overtime.append(train_loss)
         if epoch%5==0:
             epochs.append(epoch)
-            """
-            #val_loader = DataLoader(val_data, batch_size=len(val_data))
-            #val_out = [net(d) for d in val_loader]
-            #val_out = val_out[0]
-            #val_y_2d = val_out[-1]
-            #print(val_y_2d)
-            #print('validation pooling performance:', np.quantile(get_pooling_performance(val_y_2d, 2), [i/100 for i in range(0, 105, 5)]))
-            test_loader = DataLoader(train_data, batch_size=len(test_data))
-            test_out = [net(d) for d in test_loader]
-            test_out = test_out[:25]
-            print(test_out[1])
-            test_y_2d = test_out[-1]
-            print('test set pooling performance:', np.quantile(get_pooling_performance(test_y_2d, 2), [i/100 for i in range(0, 105, 5)]))
-            #print('training loss:', train_loss.item())
-            #prec_test, rec_test, MCC_test = sklearn_precision_recall_MCC(net, test_data)
-            """
             outs = get_x_scores(net, val_data, num_iters)
             outs = torch.cat(outs)
             outs = outs.squeeze(1)
@@ -138,16 +133,13 @@ def measure_performance_during_training(max_eps, net, net_name, data, val_data_p
             #data_performance.append([train_loss.item()])
     #num_eps = max_eps
     
-    #torch.save(net.state_dict(), './saved_nets/'+type_str+'/'+net_desc+'_'+str(num_eps)+'eps.pt')
     #test_best_df = pd.DataFrame(test_best_performance, index=epochs, columns=['Jaccard_top_1', 'Jaccard_top_3'])
     test_biggest_df = pd.DataFrame(test_biggest_performance, index=epochs, columns=['Jaccard_Largest_1', 'Jaccard_Largest_3'])
 
     #val_best_df = pd.DataFrame(val_performance, index=epochs, columns=['Jaccard_top_1', 'Jaccard_top_3'])
     val_biggest_df = pd.DataFrame(val_biggest_performance, index=epochs, columns=['Jaccard_largest_1', 'Jaccard_largest_3'])
 
-   # data_df = pd.DataFrame(data_performance, index=epochs, columns=['training_loss'])
     
-    #return test_df, val_df, data_df
     #return test_best_df, test_biggest_df, val_best_df, val_biggest_df, train_loss_overtime
     return test_biggest_df, val_biggest_df, train_loss_overtime, MCC_overtime, AUC_overtime, conf_mats
 
@@ -181,14 +173,7 @@ for data in test_set_ligands_ions_4A:
     test_4A_ions_RGCN.append(Data(x=data.x, y=data.y, edge_attr = transform_edge_attr(data.edge_attr), edge_index = data.edge_index))
 
 
-"""
-num_layers = 3
-min_score = 0.5
-num_iters = 3
-rand = RGCNPoolNet(num_layers, 0, min_score)
-dfs = measure_performance_during_training(50, rand, 'RGCNx'+str(num_layers)+'_edgePool_L1Sum_2xPosLabelLoss_leakyReLU'+str(min_score)+'Minscore_percent_edge_labels_'+ str(num_iters)+'iters_noOnehop_fixed', RGCN_data[:], 0.15, used_pdbs_ligands_4A[:], test_4A_RGCN, used_pdbs_ligands_test_set_4A, sites_dict_4A, num_iters)
-torch.save(dfs, './saved_networks/RGCNx'+str(num_layers)+'_edgePool_L1Sum_2xPosLabelLoss_leaky_ReLU'+str(min_score)+'Minscore_percent_edge_labels_'+ str(num_iters)+'iters_noOnehop_fixed_RESULTS')
-"""
+
 num_iters=3
 for num_layers in [2, 3, 4]:
     for min_score in [0.5, 0.75, 0.9]:
