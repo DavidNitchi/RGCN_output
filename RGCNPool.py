@@ -417,15 +417,3 @@ class RGCNPoolNet(torch.nn.Module):
         y_2d = make_y_cluster(y_2d, unpool.cluster)
         
         return x, outs, unpool, y_2d, edge_index, transform_edge_attr(onehot_edge_attr), batch, residue_scores, x_bad
-    
-if __name__ == "__main__":
-    print("")
-
-
-#Main code execution
-TE18_pyg = torch.load('./TE18_data_NodeEmbeddings.pt')
- 
-#convert dataset of pytorch geometric objects into a formt for RGCN (need a different edge format)
-TE18_RGCN = []
-for data in TE18_pyg:
-    TE18_RGCN.append(Data(x=data.x, y=data.y, edge_attr = transform_edge_attr(data.edge_attr), edge_index = data.edge_index))
