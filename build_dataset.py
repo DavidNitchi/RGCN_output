@@ -15,7 +15,8 @@ import torch
 from rnaglib.data_loading import RNADataset
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
-
+TE18 = ['2pwtA', '5v3fA', '379dB', '5bjoE', '4pqvA', '430dA', '1nemA', '1q8nA', '1f1tA', '2jukA',
+            '4yazR', '364dC', '6ez0A', '2tobA', '1ddyA', '1fmnA', '2misA', '4f8uB']
 used_pdbs_test_set_4A = torch.load('./../pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId_testSet.pt')
 used_pdbs_4A = torch.load('./../pdbs_ligands_ions_4A_embeddings_min4nbs_0.3seqId.pt')
 TE18_json = [pdb[:-1] for pdb in TE18]
