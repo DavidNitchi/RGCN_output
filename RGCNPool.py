@@ -82,16 +82,16 @@ class EdgePoolingRGCN(torch.nn.Module):
     def __init__(
         self,
         in_channels: int,
-        min_node_score: float,
         min_edge_score: float,
+        min_edge_percentile: float,
         edge_score_method: Optional[Callable] = None,
         dropout: Optional[float] = 0.0,
         add_to_edge_score: float = 0.0,
     ):
         super().__init__()
         self.in_channels = in_channels
-        self.min_node_score = min_node_score
         self.min_edge_score = min_edge_score
+        self.min_edge_percentile = min_edge_percentile
         if edge_score_method is None:
             edge_score_method = self.compute_edge_score_softmax
         self.compute_edge_score = edge_score_method
@@ -171,7 +171,7 @@ class EdgePoolingRGCN(torch.nn.Module):
         #IF GETTING WEIRD ERRORS WITH THIS U ADDED AN EMBS FIELD TO THE FORWARD WHICH DID NOT EXIST IN OTHER NETS
         #e = torch.cat([embs[edge_index[0]], embs[edge_index[1]]], dim=-1)
         edge_score = torch.cat([x[edge_index[0]], x[edge_index[1]]], dim=-1)
-        edge_score = F.relu(self.lin2(edge_score))
+        edge_score = F.leaky_relu(self.lin2(edge_score))
         #e = F.relu(self.lin3(e))
         #e = F.dropout(e, p=self.dropout, training=self.training)
         edge_score = self.lin(edge_score).view(-1)
@@ -227,9 +227,12 @@ class EdgePoolingRGCN(torch.nn.Module):
         counter = 0
         for edge_idx in perm:
             counter += 1
-            if counter >= len(perm)*(1-self.min_edge_score):
+            if counter >= len(perm)*(1-self.min_edge_percentile):
+                #print(counter, " edges were pooled")
                 break
-
+            if edge_score[edge_idx] < self.min_edge_score:
+                #print(counter, " edges were pooled")
+                break
             #if edge_index[0][edge_idx] not in good_x_inds and edge_index[1][edge_idx] not in good_x_inds:
                 #continue
             source = int(edge_index_cpu[0, edge_idx])
@@ -264,7 +267,7 @@ class EdgePoolingRGCN(torch.nn.Module):
                 (new_x.size(0) - len(new_edge_indices), ))
             remaining_score = remaining_score*0
             new_edge_score = torch.cat([new_edge_score, remaining_score])
-        
+        new_x = new_x * new_edge_score.view(-1, 1)
         new_edge_index, new_edge_attr = coalesce(cluster[edge_index], edge_attr, num_nodes=new_x.size(0))
         new_edge_attr = fix_pooled_edge_attrs(new_edge_attr)
         new_batch = x.new_empty(new_x.size(0), dtype=torch.long)
@@ -279,6 +282,7 @@ class EdgePoolingRGCN(torch.nn.Module):
         self,
         x: Tensor,
         unpool_info: UnpoolInfo,
+        n: int
     ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""Unpools a previous edge pooling step.
 
@@ -299,7 +303,16 @@ class EdgePoolingRGCN(torch.nn.Module):
         #print(x)
         #print("=============")
        #print(unpool_info)
-        new_x = x / unpool_info.new_edge_score.view(-1, 1)
+        #new_x = x / (unpool_info.new_edge_score.view(-1, 1))
+
+        #Incremental averagin of X based on edges
+        #new_x = x+1/n*(unpool_info.new_edge_score.view(-1, 1)-x)
+        #new_x = new_x[unpool_info.cluster]
+
+        #set all pooled nodes to positive
+        pooled_inds = torch.nonzero(unpool_info.new_edge_score.view(-1, 1), as_tuple=True)
+        new_x = x
+        new_x[pooled_inds] = 1
         new_x = new_x[unpool_info.cluster]
         return new_x, unpool_info.edge_index, unpool_info.batch
 
@@ -330,7 +343,7 @@ class varRGCN(torch.nn.Module):
         for l in self.layers[:-1]:
             x = l(x, edge_index, edge_attr)
             x = self.norms[ind](x)
-            x = F.relu(x)
+            x = F.leaky_relu(x)
             x = self.dropout[ind](x)
             ind += 1
         x = self.layers[-1](x, edge_index, edge_attr)
@@ -381,12 +394,13 @@ def make_y_cluster(y_2d, cluster_index):
     return new_y_2d
 
 class RGCNPoolNet(torch.nn.Module):
-    def __init__(self, num_RGCN_layers, min_node_score, min_edge_score):
+    #embedding size is an added param, old training runs won't have it for initializing the net
+    def __init__(self,embedding_size, num_RGCN_layers, min_edge_score, min_edge_percentile):
         super(RGCNPoolNet, self).__init__()
         self.layers = torch.nn.ModuleList()
 
-        self.RGCN = varRGCN(num_RGCN_layers, 640)
-        self.poolLayer = EdgePoolingRGCN(1, min_node_score, min_edge_score)
+        self.RGCN = varRGCN(num_RGCN_layers, embedding_size)
+        self.poolLayer = EdgePoolingRGCN(1, min_edge_score, min_edge_percentile)
         #for _ in range(num_pool_layers):
             #self.layers.append(self.poolLayer)
     def forward(self, x, edge_index, edge_attr, batch, y_2d):
@@ -409,11 +423,12 @@ class RGCNPoolNet(torch.nn.Module):
         """
         residue_scores = self.RGCN(x, edge_index, edge_attr)
         #print("outputs of RGCN:", residue_scores)
-       
+        residue_scores = residue_scores-residue_scores.mean()
         onehot_edge_attr = F.one_hot(edge_attr, 20)
         #x_bad is the computed new embeddings from edgepooling but this does not use weighted average so called "x_bad" bc we don't use it
         x_bad, outs, onehot_edge_attr, edge_index, batch, unpool = self.poolLayer(residue_scores, edge_index, onehot_edge_attr, batch)
         x = make_x_cluster(x, unpool.cluster, y_2d)
+        x_bad = make_x_cluster(residue_scores, unpool.cluster, y_2d)
         y_2d = make_y_cluster(y_2d, unpool.cluster)
         
         return x, outs, unpool, y_2d, edge_index, transform_edge_attr(onehot_edge_attr), batch, residue_scores, x_bad
